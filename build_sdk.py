@@ -1,298 +1,169 @@
 #!/usr/bin/env python3
 """
-SDK打包脚本
-用于构建Windows和HuggingFace环境的SDK包
+Streamlit AgGrid SDK 快速构建脚本
 """
 
-import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
+import shutil
+import platform
 
-def print_step(message):
-    """打印步骤信息"""
-    print(f"\n{'='*50}")
-    print(f"📦 {message}")
-    print(f"{'='*50}")
 
-def check_requirements():
-    """检查构建要求"""
-    print_step("检查构建要求")
-    
-    # 检查Python版本
-    if sys.version_info < (3, 8):
-        print("❌ 错误: 需要Python 3.8+")
-        return False
-    
-    # 检查必要文件
-    required_files = [
-        "setup_windows.py",
-        "setup_huggingface.py",
-        "requirements_windows.txt",
-        "requirements_huggingface.txt",
-        "st_aggrid/link_header_builder.py",
-        "st_aggrid/frontend/src/components/LinkHeaderComponent.tsx"
-    ]
-    
-    missing_files = []
-    for file in required_files:
-        if not Path(file).exists():
-            missing_files.append(file)
-    
-    if missing_files:
-        print(f"❌ 缺少必要文件: {missing_files}")
-        return False
-    
-    print("✅ 构建要求检查通过")
-    return True
+def run_cmd(cmd, cwd=None, timeout=300):
+    """运行命令"""
+    try:
+        use_shell = platform.system() == "Windows"
+        result = subprocess.run(
+            cmd,
+            cwd=cwd,
+            check=True,
+            shell=use_shell,
+            timeout=timeout,
+            capture_output=True,
+            text=True,
+        )
+        return True, result.stdout
+    except subprocess.CalledProcessError as e:
+        return False, f"命令失败: {e}\n{e.stderr}"
+    except subprocess.TimeoutExpired:
+        return False, f"命令超时: {' '.join(cmd)}"
+    except Exception as e:
+        return False, f"异常: {e}"
+
 
 def build_frontend():
-    """构建前端代码"""
-    print_step("构建前端代码")
-    
+    """构建前端"""
     frontend_dir = Path("st_aggrid/frontend")
     if not frontend_dir.exists():
-        print("❌ 前端目录不存在")
-        return False
-    
-    try:
-        # 检查Node.js
-        result = subprocess.run(["node", "--version"], capture_output=True, text=True)
-        if result.returncode != 0:
-            print("❌ 未找到Node.js，请先安装Node.js")
-            return False
-        
-        # 安装依赖
-        print("📦 安装前端依赖...")
-        subprocess.run(["npm", "install"], cwd=frontend_dir, check=True, shell=True)
-        
-        # 构建前端
-        print("🔨 构建前端代码...")
-        subprocess.run(["npm", "run", "build"], cwd=frontend_dir, check=True, shell=True)
-        
-        print("✅ 前端构建完成")
+        print("⚠️ 前端目录不存在，跳过前端构建")
         return True
-        
-    except subprocess.CalledProcessError as e:
-        print(f"❌ 前端构建失败: {e}")
+
+    # 检查Node.js
+    success, output = run_cmd(["node", "--version"])
+    if not success:
+        print("⚠️ Node.js不可用，跳过前端构建")
+        return True
+
+    print(f"📦 Node.js: {output.strip()}")
+
+    # 选择包管理器
+    if (frontend_dir / "yarn.lock").exists():
+        install_cmd = ["yarn", "install"]
+        build_cmd = ["yarn", "build"]
+        pkg_mgr = "yarn"
+    else:
+        install_cmd = ["npm", "install"]
+        build_cmd = ["npm", "run", "build"]
+        pkg_mgr = "npm"
+
+    print(f"🔧 使用 {pkg_mgr} 构建前端...")
+
+    # 安装依赖
+    success, output = run_cmd(install_cmd, cwd=frontend_dir, timeout=300)
+    if not success:
+        print(f"❌ 依赖安装失败: {output}")
         return False
 
-def build_windows_sdk():
-    """构建Windows SDK"""
-    print_step("构建Windows SDK")
-    
-    try:
-        # 使用Windows配置构建
-        subprocess.run([
-            sys.executable, "setup_windows.py", "sdist", "bdist_wheel"
-        ], check=True)
-        
-        print("✅ Windows SDK构建完成")
-        return True
-        
-    except subprocess.CalledProcessError as e:
-        print(f"❌ Windows SDK构建失败: {e}")
+    # 构建
+    success, output = run_cmd(build_cmd, cwd=frontend_dir, timeout=600)
+    if not success:
+        print(f"❌ 前端构建失败: {output}")
         return False
 
-def build_huggingface_sdk():
-    """构建HuggingFace SDK"""
-    print_step("构建HuggingFace SDK")
-    
-    try:
-        # 使用HuggingFace配置构建
-        subprocess.run([
-            sys.executable, "setup_huggingface.py", "sdist", "bdist_wheel"
-        ], check=True)
-        
-        print("✅ HuggingFace SDK构建完成")
-        return True
-        
-    except subprocess.CalledProcessError as e:
-        print(f"❌ HuggingFace SDK构建失败: {e}")
-        return False
-
-def create_package_structure():
-    """创建打包结构"""
-    print_step("创建打包结构")
-    
-    # 创建输出目录
-    output_dir = Path("sdk_output")
-    if output_dir.exists():
-        shutil.rmtree(output_dir)
-    output_dir.mkdir()
-    
-    # Windows SDK目录
-    windows_dir = output_dir / "windows"
-    windows_dir.mkdir()
-    
-    # HuggingFace SDK目录
-    huggingface_dir = output_dir / "huggingface"
-    huggingface_dir.mkdir()
-    
-    # 复制文件到Windows目录
-    windows_files = [
-        "setup_windows.py",
-        "requirements_windows.txt",
-        "install_windows.bat",
-        "README_SDK.md",
-        "link_header_example.py",
-        "test_link_header.py"
-    ]
-    
-    for file in windows_files:
-        if Path(file).exists():
-            shutil.copy2(file, windows_dir)
-    
-    # 复制文件到HuggingFace目录
-    huggingface_files = [
-        "setup_huggingface.py",
-        "requirements_huggingface.txt",
-        "install_huggingface.sh",
-        "README_SDK.md",
-        "link_header_example.py",
-        "test_link_header.py"
-    ]
-    
-    for file in huggingface_files:
-        if Path(file).exists():
-            shutil.copy2(file, huggingface_dir)
-    
-    # 复制st_aggrid目录
-    if Path("st_aggrid").exists():
-        shutil.copytree("st_aggrid", windows_dir / "st_aggrid")
-        shutil.copytree("st_aggrid", huggingface_dir / "st_aggrid")
-    
-    print("✅ 打包结构创建完成")
+    print("✅ 前端构建完成")
     return True
 
-def create_install_scripts():
-    """创建安装脚本"""
-    print_step("创建安装脚本")
-    
-    # Windows安装脚本
-    windows_install = """@echo off
-echo 正在安装 Enhanced Streamlit AgGrid SDK (Windows版本)
-echo.
 
-REM 检查Python
-python --version >nul 2>&1
-if errorlevel 1 (
-    echo 错误: 未找到Python，请先安装Python 3.8+
-    pause
-    exit /b 1
-)
+def build_python():
+    """构建Python包"""
+    print("🔧 构建Python包...")
 
-REM 创建虚拟环境
-if not exist ".venv" (
-    echo 创建虚拟环境...
-    python -m venv .venv
-)
+    # 准备dist目录
+    dist_dir = Path("dist")
+    if dist_dir.exists():
+        shutil.rmtree(dist_dir)
+    dist_dir.mkdir()
 
-REM 激活虚拟环境
-call .venv\\Scripts\\activate.bat
+    # 尝试PEP 517构建
+    success, output = run_cmd([sys.executable, "-m", "pip", "install", "-U", "build"])
+    if success:
+        success, output = run_cmd([sys.executable, "-m", "build"])
+        if success:
+            print("✅ Python包构建完成 (PEP 517)")
+            return True
 
-REM 安装依赖
-echo 安装依赖...
-pip install -r requirements_windows.txt
+    # 回退到setup.py
+    if Path("setup.py").exists():
+        success, output = run_cmd([sys.executable, "setup.py", "bdist_wheel"])
+        if success:
+            print("✅ Python包构建完成 (setup.py)")
+            return True
 
-REM 安装SDK
-echo 安装SDK...
-pip install -e .
+    print(f"❌ Python包构建失败: {output}")
+    return False
 
-echo.
-echo 安装完成！
-echo 运行示例: streamlit run link_header_example.py
-pause
-"""
-    
-    # HuggingFace安装脚本
-    huggingface_install = """#!/bin/bash
-echo "正在安装 Enhanced Streamlit AgGrid SDK (HuggingFace版本)"
-echo ""
-
-# 检查Python
-if ! command -v python3 &> /dev/null; then
-    echo "错误: 未找到Python3，请先安装Python 3.8+"
-    exit 1
-fi
-
-# 创建虚拟环境
-if [ ! -d ".venv" ]; then
-    echo "创建虚拟环境..."
-    python3 -m venv .venv
-fi
-
-# 激活虚拟环境
-source .venv/bin/activate
-
-# 安装依赖
-echo "安装依赖..."
-pip install -r requirements_huggingface.txt
-
-# 安装SDK
-echo "安装SDK..."
-pip install -e .
-
-echo ""
-echo "安装完成！"
-echo "运行示例: streamlit run link_header_example.py"
-"""
-    
-    # 写入文件
-    with open("sdk_output/windows/install.bat", "w", encoding="utf-8") as f:
-        f.write(windows_install)
-    
-    with open("sdk_output/huggingface/install.sh", "w", encoding="utf-8") as f:
-        f.write(huggingface_install)
-    
-    # 设置执行权限
-    os.chmod("sdk_output/huggingface/install.sh", 0o755)
-    
-    print("✅ 安装脚本创建完成")
 
 def main():
     """主函数"""
-    print("🚀 Enhanced Streamlit AgGrid SDK 打包工具")
-    print("="*60)
-    
-    # 检查要求
-    if not check_requirements():
+    print("🚀 Streamlit AgGrid SDK 快速构建")
+    print("=" * 40)
+
+    # 检查Python版本
+    if sys.version_info < (3, 8):
+        print("❌ 需要Python 3.8+")
         sys.exit(1)
-    
+
+    print(f"✅ Python: {sys.version.split()[0]}")
+
     # 构建前端
-    if not build_frontend():
-        print("⚠️ 前端构建失败，但继续打包...")
-    
-    # 构建Windows SDK
-    if not build_windows_sdk():
-        print("⚠️ Windows SDK构建失败")
-    
-    # 构建HuggingFace SDK
-    if not build_huggingface_sdk():
-        print("⚠️ HuggingFace SDK构建失败")
-    
-    # 创建打包结构
-    if not create_package_structure():
-        sys.exit(1)
-    
-    # 创建安装脚本
-    create_install_scripts()
-    
-    print_step("打包完成")
-    print("📦 SDK包已生成在 sdk_output/ 目录下")
-    print("")
-    print("📁 目录结构:")
-    print("  sdk_output/")
-    print("  ├── windows/          # Windows环境SDK")
-    print("  └── huggingface/      # HuggingFace环境SDK")
-    print("")
-    print("🚀 使用方法:")
-    print("  1. 进入对应环境目录")
-    print("  2. 运行安装脚本")
-    print("  3. 运行示例程序")
-    print("")
-    print("✅ 打包完成！")
+    if "--skip-frontend" not in sys.argv:
+        if not build_frontend():
+            if "--strict" in sys.argv:
+                sys.exit(1)
+            print("⚠️ 前端构建失败，继续Python包构建...")
+    else:
+        print("⏭️ 跳过前端构建")
+
+    # 构建Python包
+    if "--skip-python" not in sys.argv:
+        if not build_python():
+            sys.exit(1)
+    else:
+        print("⏭️ 跳过Python包构建")
+
+    # 显示结果
+    wheels = list(Path("dist").glob("*.whl"))
+    if wheels:
+        print(f"\n🎉 构建完成! 生成了 {len(wheels)} 个文件:")
+        for wheel in wheels:
+            print(f"  📦 {wheel.name}")
+    else:
+        print("\n⚠️ 未找到生成的wheel文件")
+
 
 if __name__ == "__main__":
-    main() 
+    if "--help" in sys.argv or "-h" in sys.argv:
+        print("""
+用法: python build_sdk.py [选项]
+
+选项:
+  --skip-frontend    跳过前端构建
+  --skip-python      跳过Python包构建
+  --strict           前端构建失败时停止
+  --help, -h         显示帮助
+
+示例:
+  python build_sdk.py                 # 完整构建
+  python build_sdk.py --skip-frontend # 只构建Python包
+        """)
+        sys.exit(0)
+
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n❌ 构建被中断")
+        sys.exit(1)
+    except Exception as e:
+        print(f"\n❌ 构建失败: {e}")
+        sys.exit(1)

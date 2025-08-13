@@ -13,62 +13,94 @@ This SDK extends the `st-aggrid` library with a custom link header component tha
 - 🔗 **Custom Link Headers**: Add clickable link icons to column headers
 - 📊 **Full Grid Functionality**: Maintains sorting, filtering, and resizing capabilities
 - 🎯 **Event Isolation**: Clicking the link icon doesn't interfere with sorting/filtering
+- 📏 **Auto-Width Adjustment**: Automatically adjusts column width to fit header text
 - 🛠️ **Easy Integration**: Simple API for creating link-enabled columns
-- 📦 **Cross-Platform**: Supports both Windows and HuggingFace environments
+- 🔧 **Enhanced Error Handling**: Robust error handling with multiple fallback strategies
+- 📦 **Cross-Platform**: Supports Windows, Linux, and macOS environments
+- ⚡ **Fast Build System**: Simplified, single-command build process
 
 ## Building the SDK
 
 ### Prerequisites
 
-- Python 3.8+
-- Node.js 16+
-- Yarn or npm
+- **Python 3.8+** (required)
+- **Node.js 14+** (optional, for frontend building)
+- **npm** or **yarn** (auto-detected if available)
 
-### Build Process
+### Quick Build
 
-1. **Install Dependencies**
-   ```bash
-   # Install Python dependencies
-   pip install -r requirements.txt
-   
-   # Install Node.js dependencies
-   cd st_aggrid/frontend
-   npm install
-   ```
+```bash
+# Complete build (frontend + Python package)
+python build_sdk.py
 
-2. **Build Frontend**
-   ```bash
-   cd st_aggrid/frontend
-   npm run build
-   ```
+# Python package only (skip frontend)
+python build_sdk.py --skip-frontend
 
-3. **Build SDK Package**
-   ```bash
-   # Run the build script
-   python build_sdk.py
-   ```
+# View all options
+python build_sdk.py --help
+```
 
-The build script will:
-- Build the frontend assets
-- Create wheel packages for both Windows and HuggingFace environments
-- Generate SDK output in `sdk_output/` directory
+### Build Options
+
+| Option            | Description                    | Example                               |
+| ----------------- | ------------------------------ | ------------------------------------- |
+| `--skip-frontend` | Skip frontend build            | `python build_sdk.py --skip-frontend` |
+| `--skip-python`   | Skip Python package build      | `python build_sdk.py --skip-python`   |
+| `--strict`        | Stop on frontend build failure | `python build_sdk.py --strict`        |
+| `--help`, `-h`    | Show help message              | `python build_sdk.py --help`          |
+
+### What the Script Does
+
+1. **Environment Check**: Detects Python version and Node.js availability
+2. **Frontend Build**: If Node.js is available, automatically runs:
+   - `npm install` or `yarn install` (auto-detects based on lock files)
+   - `npm run build` or `yarn build`
+3. **Python Package Build**: Creates wheel and source distribution using:
+   - PEP 517 build system (preferred)
+   - Falls back to `setup.py` if needed
 
 ### Build Output
 
-After successful build, you'll find:
-- `sdk_output/windows/` - Windows environment SDK
-- `sdk_output/huggingface/` - HuggingFace environment SDK
+After successful build, you'll find in `dist/`:
 
-Each directory contains:
-- `streamlit_aggrid-1.1.7-py3-none-any.whl` - Wheel package
-- `install.bat` (Windows) or `install.sh` (HuggingFace) - Installation script
-- `README.md` - Installation instructions
+- `streamlit_aggrid-<version>-py3-none-any.whl`
+- `streamlit_aggrid-<version>.tar.gz`
+
+### Build Examples
+
+```bash
+# Standard build (recommended)
+python build_sdk.py
+# Output:
+# 🚀 Streamlit AgGrid SDK 快速构建
+# ✅ Python: 3.9.7
+# 📦 Node.js: v18.17.0
+# 🔧 使用 npm 构建前端...
+# ✅ 前端构建完成
+# ✅ Python包构建完成 (PEP 517)
+# 🎉 构建完成! 生成了 1 个文件:
+#   📦 streamlit_aggrid-1.1.7-py3-none-any.whl
+
+# If Node.js is not available
+python build_sdk.py
+# Output:
+# ✅ Python: 3.9.7
+# ⚠️ Node.js不可用，跳过前端构建
+# ✅ Python包构建完成 (PEP 517)
+
+# Python package only
+python build_sdk.py --skip-frontend
+# Output:
+# ✅ Python: 3.9.7
+# ⏭️ 跳过前端构建
+# ✅ Python包构建完成 (PEP 517)
+```
 
 ## Installation
 
 ```bash
 # Install from local wheel file
-pip install -i https://pypi.tuna.tsinghua.edu.cn/simple dist/streamlit_aggrid-1.1.7-py3-none-any.whl
+pip install dist/*.whl
 ```
 
 ## Quick Start
@@ -133,12 +165,14 @@ grid_response = AgGrid(
 Creates a column definition with a custom link header.
 
 **Parameters:**
+
 - `field` (str): Data field name
 - `header_name` (str): Column header name
 - `url` (str): URL template for the link (supports {field} placeholder)
 - `**kwargs`: Additional column configuration options
 
 **Returns:**
+
 - `dict`: Column definition dictionary
 
 ### `create_link_columns(link_config, **default_kwargs)`
@@ -146,10 +180,12 @@ Creates a column definition with a custom link header.
 Creates multiple link columns from a configuration dictionary.
 
 **Parameters:**
+
 - `link_config` (dict): Dictionary mapping field names to URLs
 - `**default_kwargs`: Default configuration for all columns
 
 **Returns:**
+
 - `dict`: Dictionary of column definitions
 
 ### `add_link_headers_to_grid_options(grid_options, link_config, **default_kwargs)`
@@ -157,11 +193,13 @@ Creates multiple link columns from a configuration dictionary.
 Adds link column configurations to existing grid options.
 
 **Parameters:**
+
 - `grid_options` (dict): Existing grid options
 - `link_config` (dict): Dictionary mapping field names to URLs
 - `**default_kwargs`: Default configuration for all columns
 
 **Returns:**
+
 - `dict`: Updated grid options
 
 ## Advanced Usage
@@ -215,21 +253,65 @@ See `test_streamlit_app.py` for a complete working example.
 
 ## Troubleshooting
 
+### Build Issues
+
+**Issue**: Frontend build fails
+
+- Try building Python package only: `python build_sdk.py --skip-frontend`
+- Check if Node.js is properly installed: `node --version`
+- Verify npm/yarn is available: `npm --version` or `yarn --version`
+
+**Issue**: "Package not found" errors
+
+- Ensure you're in the correct project directory
+- Check if `pyproject.toml` or `setup.py` exists
+
+### Component Issues
+
 **Issue**: Link icons not showing
+
 - Check if `create_link_column` function is imported correctly
 - Verify column definitions are properly added to `grid_options['columnDefs']`
+- Ensure the frontend build was successful and includes the latest components
 
 **Issue**: Sorting/filtering functionality lost
+
 - Ensure `sortable=True` and `filter=True` are set in `create_link_column`
 - Check if `headerComponentParams` structure is used correctly
 
+**Issue**: Column width too narrow, text wrapping
+
+- The component now automatically adjusts column width to fit text
+- If issues persist, manually set `minWidth` in column configuration:
+  ```python
+  column = create_link_column(
+      field='email',
+      header_name='Email Address',
+      url='mailto:{email}',
+      minWidth=150  # Set minimum width
+  )
+  ```
+
 **Issue**: Clicking links not responding
+
 - Verify URL format is correct
 - Check browser console for JavaScript errors
+- Ensure URLs use proper format with field placeholders: `https://example.com/{field}`
 
 ## Notes
 
 1. **URL Templates**: URLs support `{field}` placeholders that get replaced with actual data
 2. **Event Handling**: Clicking the 🔗 icon prevents event bubbling and won't trigger sorting
-3. **Styling**: Link icons use default colors and maintain consistency with header text
-4. **Compatibility**: Fully compatible with all `ag-grid` functionality
+3. **Auto-Width**: Component automatically adjusts column width to prevent text wrapping
+4. **Styling**: Link icons use default colors and maintain consistency with header text
+5. **Build System**: Fast, single-command build with automatic Node.js detection
+6. **Error Recovery**: Multiple fallback strategies ensure reliable package generation
+7. **Compatibility**: Fully compatible with all `ag-grid` functionality and modern browsers
+
+## Recent Updates (v1.1.7)
+
+- ✅ **Fixed LinkHeaderComponent Implementation**: Resolved text wrapping issues in column headers
+- ✅ **Enhanced Auto-Width Logic**: Improved column width calculation and adjustment
+- ✅ **Simplified Build System**: Streamlined build process with better error handling
+- ✅ **Cross-Platform Support**: Improved Windows compatibility for build scripts
+- ✅ **Better Error Recovery**: Multiple fallback strategies for package building

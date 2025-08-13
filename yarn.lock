@@ -4876,7 +4876,7 @@ fresh@0.5.2:
   resolved "https://registry.npmmirror.com/fresh/-/fresh-0.5.2.tgz"
   integrity sha512-zJ2mQYM18rEFOudeV4GShTGIQ7RbzA7ozbU9I/XBpm7kqgMywgmylMwXHxZJmkVoYkna9d2pVXVXPdYTP9ej8Q==
 
-"frontend@file:D:\\PycharmProjects\\streamlit-aggrid\\st_aggrid\\frontend":
+"frontend@file:D:\\something_interesting\\streamlit-aggrid-link_header\\st_aggrid\\frontend":
   version "1.1.5"
   resolved "file:st_aggrid/frontend"
   dependencies:
